@@ -1,0 +1,68 @@
+import cv2
+import numpy as np
+import serial
+import time
+ser = serial.Serial("COM6", baudrate=115200, timeout=1)
+
+# Initialize the camera capture (0 represents the default camera)
+#cap = cv2.VideoCapture('https://10.1.5.236:8080/video')
+cap = cv2.VideoCapture(0)
+
+# Define the lower and upper HSV color thresholds for detecting fire
+lower_color = np.array([20, 100, 100])  # Lower bound for red color in HSV
+upper_color = np.array([50, 255, 255])  # Upper bound for red color in HSV
+
+while True:
+    ret, frame = cap.read()
+
+    # Convert the frame to HSV color space
+    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Create a mask to isolate the red regions (fire)
+    mask = cv2.inRange(hsv_frame, lower_color, upper_color)
+
+    # Apply morphological operations to reduce noise in the mask
+    mask = cv2.erode(mask, None, iterations=2)
+    mask = cv2.dilate(mask, None, iterations=2)
+
+    # Find contours in the mask
+    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Check for the presence of fire
+    fire_detected = False
+
+    for contour in contours:
+        if cv2.contourArea(contour) > 500:
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            fire_detected = True
+
+
+
+    if fire_detected == True: 
+        ser.write(b'h')
+           
+    else:
+        ser.write(b'L')
+    
+
+    # Display the resulting frame with fire detection
+    if fire_detected:
+        #ser.write(b'h')
+        #time.sleep(0.5)
+        cv2.putText(frame, 'Fire Detected', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+    
+    cv2.imshow('Fire Detection', frame)
+
+
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+    #if fire_detected == False:
+    #    ser.write(b'L')
+
+        
+cap.release()
+cv2.destroyAllWindows()
